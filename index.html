@@ -4,142 +4,91 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KU Energy Monitoring</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
-    
     <style>
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            background: #f0f2f5; 
-            margin: 0; 
-            padding: 20px; 
-            color: #333; 
-        }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; margin: 0; padding: 20px; }
         .container { max-width: 1200px; margin: auto; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         
-        /* ปุ่มเลือกช่วงเวลา 1h, 1d, 3d */
+        /* สไตล์ปุ่มกด */
         .time-filters button {
             background: white; border: 1px solid #ddd; padding: 8px 15px; 
-            cursor: pointer; border-radius: 5px; margin-left: 5px; font-weight: bold; color: #555;
+            cursor: pointer; border-radius: 5px; margin-left: 5px; font-weight: bold;
         }
         .time-filters button.active { background: #f1c40f; color: #333; border-color: #f1c40f; }
 
-        .grid-dashboard {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 20px;
-        }
-
-        .card { 
-            background: white; padding: 20px; border-radius: 12px; 
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
-        }
-        
-        .label { font-size: 0.85rem; color: #888; text-transform: uppercase; font-weight: bold; margin-bottom: 10px; }
+        .grid-dashboard { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .label { font-size: 0.85rem; color: #888; text-transform: uppercase; font-weight: bold; }
         .value-text { font-size: 2.2rem; font-weight: bold; color: #2c3e50; margin: 5px 0; }
-        .unit { font-size: 0.9rem; color: #999; }
-
-        /* เกจวัดวงกลม */
-        .gauge-container {
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            height: 110px;
-        }
-        .gauge-circle {
-            width: 90px; height: 90px; border-radius: 50%; 
-            border: 7px solid #f0f2f5; 
-            display: flex; align-items: center; justify-content: center;
-            flex-direction: column;
-        }
+        
+        /* เกจวัด */
+        .gauge-container { display: flex; flex-direction: column; align-items: center; height: 110px; }
+        .gauge-circle { width: 90px; height: 90px; border-radius: 50%; border: 7px solid #f0f2f5; display: flex; align-items: center; justify-content: center; flex-direction: column; }
         .gauge-circle.yellow { border-top-color: #f1c40f; } 
         .gauge-circle.blue { border-top-color: #3498db; }  
         .gauge-circle.red { border-top-color: #e74c3c; }   
-        .gauge-val { font-size: 1.4rem; font-weight: bold; color: #333; }
+        .gauge-val { font-size: 1.4rem; font-weight: bold; }
         
-        .full-card { grid-column: span 4; }
-        .cost-card { grid-column: span 4; border-left: 5px solid #e67e22; }
-        
-        model-viewer {
-            width: 100%;
-            height: 400px; /* ปรับให้สูงขึ้นเพื่อให้เห็นโมเดลชัดๆ */
-            background-color: #fafbfc;
-            border-radius: 8px;
-        }
+        .wide-card { grid-column: span 2; }
+        .full-card { grid-column: span 4; border-left: 5px solid #e67e22; }
+        model-viewer { width: 100%; height: 300px; background: #fafbfc; border-radius: 8px; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div class="header">
-        <h2>⚡ KUWIN Energy Dashboard</h2>
-        <div class="time-filters">
-            <button class="active" onclick="changeTimeFilter(event)">1h</button>
-            <button onclick="changeTimeFilter(event)">1d</button>
-            <button onclick="changeTimeFilter(event)">3d</button>
+        <h2>⚡ KU Energy Dashboard</h2>
+        <div class="time-filters" id="filter-group">
+            <button class="active" onclick="updateView('live')">Live</button>
+            <button onclick="updateView('1h')">1h</button>
+            <button onclick="updateView('1d')">1d</button>
+            <button onclick="updateView('3d')">3d</button>
         </div>
     </div>
 
     <div class="grid-dashboard">
-        <div class="card">
-            <div class="label">Voltage</div>
-            <div class="value-text" id="val-v">0.0 <span class="unit">V</span></div>
-        </div>
+        <div class="card"><div class="label">Voltage</div><div class="value-text"><span id="val-v">0.0</span> <small style="font-size: 1rem;">V</small></div></div>
+        <div class="card"><div class="label" style="text-align:center;">Power</div><div class="gauge-container"><div class="gauge-circle yellow"><span class="gauge-val" id="val-w">0</span><small>W</small></div></div></div>
+        <div class="card"><div class="label" style="text-align:center;">Current</div><div class="gauge-container"><div class="gauge-circle red"><span class="gauge-val" id="val-a">0</span><small>A</small></div></div></div>
+        <div class="card"><div class="label" style="text-align:center;">Energy</div><div class="gauge-container"><div class="gauge-circle blue"><span class="gauge-val" id="val-kwh">0</span><small>kWh</small></div></div></div>
 
-        <div class="card">
-            <div class="label" style="text-align: center;">Power</div>
-            <div class="gauge-container">
-                <div class="gauge-circle yellow">
-                    <span class="gauge-val" id="val-w">0</span>
-                    <span class="unit">W</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="label" style="text-align: center;">Current</div>
-            <div class="gauge-container">
-                <div class="gauge-circle red">
-                    <span class="gauge-val" id="val-a">0</span>
-                    <span class="unit">A</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="label" style="text-align: center;">Energy</div>
-            <div class="gauge-container">
-                <div class="gauge-circle blue">
-                    <span class="gauge-val" id="val-kwh">0</span>
-                    <span class="unit">kWh</span>
-                </div>
-            </div>
-        </div>
+        <div class="card wide-card"><div class="label">3D Building View</div><model-viewer src="building.glb" auto-rotate camera-controls shadow-intensity="1"></model-viewer></div>
+        <div class="card wide-card"><div class="label">Power History (W)</div><canvas id="powerChart" height="250"></canvas></div>
 
         <div class="card full-card">
-            <div class="label">Building View (Interactive 3D)</div>
-            <model-viewer src="building.glb" alt="3D Building" auto-rotate camera-controls shadow-intensity="1"></model-viewer>
-        </div>
-
-        <div class="card cost-card">
-            <div class="label">ประมาณการค่าไฟฟ้า (อัตรา 4.2.3)</div>
-            <div class="value-text" style="color: #e67e22;" id="val-cost">0.00 <span class="unit">บาท</span></div>
-            <div style="font-size: 0.85rem; color: #7f8c8d;" id="period-status">คำนวณรวม VAT 7% และ Ft แล้ว</div>
+            <div class="label">ประมาณการค่าไฟฟ้า</div>
+            <div class="value-text" style="color: #e67e22;" id="val-cost">0.00 <small>บาท</small></div>
+            <div id="period-status" style="font-size: 0.85rem; color: #7f8c8d;">-</div>
         </div>
     </div>
 </div>
 
 <script>
-    // ==========================================
-    // ⚠️ นำ Web App URL ของคุณมาใส่ตรงนี้ ⚠️
-    // ==========================================
     const API_URL = "https://script.google.com/macros/s/AKfycbxR_U0VKyROaGE_locdROC8TgzftrUQsJghvbDEOsJjVmwU70tyhVXmVkezPzdy8la9/exec?action=read";
+    let powerChart;
+    let allData = [];
+    let currentFilter = 'live';
+
+    function initChart() {
+        const ctx = document.getElementById('powerChart').getContext('2d');
+        powerChart = new Chart(ctx, {
+            type: 'line',
+            data: { labels: [], datasets: [{ label: 'Watt', data: [], borderColor: '#f1c40f', backgroundColor: 'rgba(241,196,15,0.1)', fill: true, tension: 0.3, pointRadius: 0 }] },
+            options: { responsive: true, maintainAspectRatio: false, scales: { x: { ticks: { maxTicksLimit: 6 } }, y: { beginAtZero: true } }, plugins: { legend: { display: false } }, animation: false }
+        });
+    }
 
     async function fetchData() {
         try {
             const res = await fetch(API_URL);
             const data = await res.json();
             if(data.error) return;
+            allData = data.history;
 
-            // อัปเดตตัวเลขและเกจ
+            // อัปเดตค่าล่าสุดลง Card/Gauge
             document.getElementById('val-v').innerText = parseFloat(data.latest.v).toFixed(1);
             document.getElementById('val-w').innerText = parseFloat(data.latest.w).toFixed(0); 
             document.getElementById('val-a').innerText = parseFloat(data.latest.a).toFixed(2); 
@@ -148,24 +97,37 @@
             // คำนวณค่าไฟ
             const now = new Date();
             let isOnPeak = (now.getDay() >= 1 && now.getDay() <= 5 && now.getHours() >= 9 && now.getHours() < 22);
-            let totalCost = data.latest.kwh * ((isOnPeak ? 4.3297 : 2.6369) + 0.3972) * 1.07; 
-            document.getElementById('val-cost').innerHTML = totalCost.toLocaleString(undefined, {minimumFractionDigits: 2}) + ' <span class="unit">บาท</span>';
-            document.getElementById('period-status').innerText = "ช่วงเวลาปัจจุบัน: " + (isOnPeak ? "ON-PEAK" : "OFF-PEAK");
+            let cost = data.latest.kwh * ((isOnPeak ? 4.3297 : 2.6369) + 0.3972) * 1.07; 
+            document.getElementById('val-cost').innerHTML = cost.toLocaleString(undefined, {minimumFractionDigits: 2}) + ' <small>บาท</small>';
+            document.getElementById('period-status').innerText = "ช่วงเวลา: " + (isOnPeak ? "ON-PEAK" : "OFF-PEAK");
 
-        } catch (e) { 
-            console.error("Error fetching data:", e); 
-        }
+            renderChart();
+        } catch (e) { console.error("Error:", e); }
     }
 
-    // ฟังก์ชันสำหรับสลับปุ่ม 1h, 1d, 3d (ไฮไลท์สีเหลือง)
-    function changeTimeFilter(event) {
+    function updateView(filter) {
+        currentFilter = filter;
         document.querySelectorAll('.time-filters button').forEach(btn => btn.classList.remove('active'));
         event.target.classList.add('active');
+        renderChart();
     }
 
-    // เริ่มดึงข้อมูลทันที และรีเฟรชทุกๆ 15 วินาที
+    function renderChart() {
+        if(allData.length === 0) return;
+        let count = 20; // live
+        if(currentFilter === '1h') count = 180;
+        if(currentFilter === '1d') count = 4320;
+        if(currentFilter === '3d') count = 12960;
+
+        let display = allData.slice(-count);
+        powerChart.data.labels = display.map(d => new Date(d.time).toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'}));
+        powerChart.data.datasets[0].data = display.map(d => d.w);
+        powerChart.update();
+    }
+
+    initChart();
     fetchData();
-    setInterval(fetchData, 15000); 
+    setInterval(fetchData, 10000); 
 </script>
 </body>
 </html>
