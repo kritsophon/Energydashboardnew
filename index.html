@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KUWIN Energy Monitoring</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
     
     <style>
@@ -56,16 +55,15 @@
         .gauge-circle.red { border-top-color: #e74c3c; }   
         .gauge-val { font-size: 1.4rem; font-weight: bold; color: #333; }
         
-        .wide-card { grid-column: span 2; }
-        .full-card { grid-column: span 4; border-left: 5px solid #e67e22; }
+        .full-card { grid-column: span 4; }
+        .cost-card { grid-column: span 4; border-left: 5px solid #e67e22; }
         
         model-viewer {
             width: 100%;
-            height: 300px;
+            height: 400px; /* ปรับให้สูงขึ้นเพื่อให้เห็นโมเดลชัดๆ */
             background-color: #fafbfc;
             border-radius: 8px;
         }
-        canvas { max-height: 300px; }
     </style>
 </head>
 <body>
@@ -74,9 +72,9 @@
     <div class="header">
         <h2>⚡ KUWIN Energy Dashboard</h2>
         <div class="time-filters">
-            <button class="active" onclick="updateChart('1h')">1h</button>
-            <button onclick="updateChart('1d')">1d</button>
-            <button onclick="updateChart('3d')">3d</button>
+            <button class="active" onclick="changeTimeFilter(event)">1h</button>
+            <button onclick="changeTimeFilter(event)">1d</button>
+            <button onclick="changeTimeFilter(event)">3d</button>
         </div>
     </div>
 
@@ -116,17 +114,12 @@
             </div>
         </div>
 
-        <div class="card wide-card">
-            <div class="label">Building View</div>
+        <div class="card full-card">
+            <div class="label">Building View (Interactive 3D)</div>
             <model-viewer src="building.glb" alt="3D Building" auto-rotate camera-controls shadow-intensity="1"></model-viewer>
         </div>
 
-        <div class="card wide-card">
-            <div class="label">Power History (W)</div>
-            <canvas id="powerChart"></canvas>
-        </div>
-
-        <div class="card full-card">
+        <div class="card cost-card">
             <div class="label">ประมาณการค่าไฟฟ้า (อัตรา 4.2.3)</div>
             <div class="value-text" style="color: #e67e22;" id="val-cost">0.00 <span class="unit">บาท</span></div>
             <div style="font-size: 0.85rem; color: #7f8c8d;" id="period-status">คำนวณรวม VAT 7% และ Ft แล้ว</div>
@@ -135,26 +128,16 @@
 </div>
 
 <script>
+    // ==========================================
+    // ⚠️ นำ Web App URL ของคุณมาใส่ตรงนี้ ⚠️
+    // ==========================================
     const API_URL = "https://script.google.com/macros/s/AKfycbxR_U0VKyROaGE_locdROC8TgzftrUQsJghvbDEOsJjVmwU70tyhVXmVkezPzdy8la9/exec?action=read";
-    let powerChart;
-    let allData = [];
-
-    function initChart() {
-        const ctx = document.getElementById('powerChart').getContext('2d');
-        powerChart = new Chart(ctx, {
-            type: 'line',
-            data: { labels: [], datasets: [{ label: 'W', data: [], borderColor: '#f1c40f', backgroundColor: 'rgba(241, 196, 15, 0.1)', fill: true, tension: 0.3, pointRadius: 0 }] },
-            options: { responsive: true, maintainAspectRatio: false, scales: { x: { ticks: { maxTicksLimit: 6 } }, y: { beginAtZero: true } }, plugins: { legend: { display: false } }, animation: false }
-        });
-    }
 
     async function fetchData() {
         try {
             const res = await fetch(API_URL);
             const data = await res.json();
             if(data.error) return;
-
-            allData = data.history;
 
             // อัปเดตตัวเลขและเกจ
             document.getElementById('val-v').innerText = parseFloat(data.latest.v).toFixed(1);
@@ -167,33 +150,20 @@
             let isOnPeak = (now.getDay() >= 1 && now.getDay() <= 5 && now.getHours() >= 9 && now.getHours() < 22);
             let totalCost = data.latest.kwh * ((isOnPeak ? 4.3297 : 2.6369) + 0.3972) * 1.07; 
             document.getElementById('val-cost').innerHTML = totalCost.toLocaleString(undefined, {minimumFractionDigits: 2}) + ' <span class="unit">บาท</span>';
-            document.getElementById('period-status').innerText = "ช่วงเวลา: " + (isOnPeak ? "ON-PEAK" : "OFF-PEAK");
+            document.getElementById('period-status').innerText = "ช่วงเวลาปัจจุบัน: " + (isOnPeak ? "ON-PEAK" : "OFF-PEAK");
 
-            // อัปเดตกราฟตามปุ่มที่เลือก
-            let activeBtn = document.querySelector('.time-filters button.active').innerText;
-            updateChart(activeBtn.toLowerCase(), false);
-
-        } catch (e) { console.error(e); }
-    }
-
-    function updateChart(timeframe, changeActive = true) {
-        if(changeActive) {
-            document.querySelectorAll('.time-filters button').forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
+        } catch (e) { 
+            console.error("Error fetching data:", e); 
         }
-        if(allData.length === 0) return;
-
-        let sliceCount = 180; // 1h
-        if(timeframe === '1d') sliceCount = 4320;
-        if(timeframe === '3d') sliceCount = 12960;
-
-        let displayData = allData.slice(-sliceCount);
-        powerChart.data.labels = displayData.map(d => new Date(d.time).toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'}));
-        powerChart.data.datasets[0].data = displayData.map(d => d.w);
-        powerChart.update();
     }
 
-    initChart();
+    // ฟังก์ชันสำหรับสลับปุ่ม 1h, 1d, 3d (ไฮไลท์สีเหลือง)
+    function changeTimeFilter(event) {
+        document.querySelectorAll('.time-filters button').forEach(btn => btn.classList.remove('active'));
+        event.target.classList.add('active');
+    }
+
+    // เริ่มดึงข้อมูลทันที และรีเฟรชทุกๆ 15 วินาที
     fetchData();
     setInterval(fetchData, 15000); 
 </script>
