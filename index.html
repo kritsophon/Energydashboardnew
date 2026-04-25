@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KU Energy Monitoring</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; margin: 0; padding: 20px; }
@@ -31,9 +30,10 @@
         .gauge-circle.red { border-top-color: #e74c3c; }   
         .gauge-val { font-size: 1.4rem; font-weight: bold; }
         
-        .wide-card { grid-column: span 2; }
-        .full-card { grid-column: span 4; border-left: 5px solid #e67e22; }
-        model-viewer { width: 100%; height: 300px; background: #fafbfc; border-radius: 8px; }
+        /* จัด Layout ให้ 3D และ ค่าไฟ เต็มจอ */
+        .full-card { grid-column: span 4; }
+        .cost-card { grid-column: span 4; border-left: 5px solid #e67e22; }
+        model-viewer { width: 100%; height: 400px; background: #fafbfc; border-radius: 8px; }
     </style>
 </head>
 <body>
@@ -42,10 +42,10 @@
     <div class="header">
         <h2>⚡ KU Energy Dashboard</h2>
         <div class="time-filters" id="filter-group">
-            <button class="active" onclick="updateView('live')">Live</button>
-            <button onclick="updateView('1h')">1h</button>
-            <button onclick="updateView('1d')">1d</button>
-            <button onclick="updateView('3d')">3d</button>
+            <button class="active" onclick="updateView('live', event)">Live</button>
+            <button onclick="updateView('1h', event)">1h</button>
+            <button onclick="updateView('1d', event)">1d</button>
+            <button onclick="updateView('3d', event)">3d</button>
         </div>
     </div>
 
@@ -55,10 +55,12 @@
         <div class="card"><div class="label" style="text-align:center;">Current</div><div class="gauge-container"><div class="gauge-circle red"><span class="gauge-val" id="val-a">0</span><small>A</small></div></div></div>
         <div class="card"><div class="label" style="text-align:center;">Energy</div><div class="gauge-container"><div class="gauge-circle blue"><span class="gauge-val" id="val-kwh">0</span><small>kWh</small></div></div></div>
 
-        <div class="card wide-card"><div class="label">3D Building View</div><model-viewer src="building.glb" auto-rotate camera-controls shadow-intensity="1"></model-viewer></div>
-        <div class="card wide-card"><div class="label">Power History (W)</div><canvas id="powerChart" height="250"></canvas></div>
-
         <div class="card full-card">
+            <div class="label">3D Building View</div>
+            <model-viewer src="building.glb" auto-rotate camera-controls shadow-intensity="1"></model-viewer>
+        </div>
+
+        <div class="card cost-card">
             <div class="label">ประมาณการค่าไฟฟ้า</div>
             <div class="value-text" style="color: #e67e22;" id="val-cost">0.00 <small>บาท</small></div>
             <div id="period-status" style="font-size: 0.85rem; color: #7f8c8d;">-</div>
@@ -67,26 +69,16 @@
 </div>
 
 <script>
+    // ==========================================
+    // ⚠️ นำ Web App URL ของคุณมาใส่ตรงนี้ ⚠️
+    // ==========================================
     const API_URL = "https://script.google.com/macros/s/AKfycbxR_U0VKyROaGE_locdROC8TgzftrUQsJghvbDEOsJjVmwU70tyhVXmVkezPzdy8la9/exec?action=read";
-    let powerChart;
-    let allData = [];
-    let currentFilter = 'live';
-
-    function initChart() {
-        const ctx = document.getElementById('powerChart').getContext('2d');
-        powerChart = new Chart(ctx, {
-            type: 'line',
-            data: { labels: [], datasets: [{ label: 'Watt', data: [], borderColor: '#f1c40f', backgroundColor: 'rgba(241,196,15,0.1)', fill: true, tension: 0.3, pointRadius: 0 }] },
-            options: { responsive: true, maintainAspectRatio: false, scales: { x: { ticks: { maxTicksLimit: 6 } }, y: { beginAtZero: true } }, plugins: { legend: { display: false } }, animation: false }
-        });
-    }
-
+    
     async function fetchData() {
         try {
             const res = await fetch(API_URL);
             const data = await res.json();
             if(data.error) return;
-            allData = data.history;
 
             // อัปเดตค่าล่าสุดลง Card/Gauge
             document.getElementById('val-v').innerText = parseFloat(data.latest.v).toFixed(1);
@@ -99,33 +91,20 @@
             let isOnPeak = (now.getDay() >= 1 && now.getDay() <= 5 && now.getHours() >= 9 && now.getHours() < 22);
             let cost = data.latest.kwh * ((isOnPeak ? 4.3297 : 2.6369) + 0.3972) * 1.07; 
             document.getElementById('val-cost').innerHTML = cost.toLocaleString(undefined, {minimumFractionDigits: 2}) + ' <small>บาท</small>';
-            document.getElementById('period-status').innerText = "ช่วงเวลา: " + (isOnPeak ? "ON-PEAK" : "OFF-PEAK");
+            document.getElementById('period-status').innerText = "ช่วงเวลาปัจจุบัน: " + (isOnPeak ? "ON-PEAK" : "OFF-PEAK");
 
-            renderChart();
-        } catch (e) { console.error("Error:", e); }
+        } catch (e) { 
+            console.error("Error Fetching Data:", e); 
+        }
     }
 
-    function updateView(filter) {
-        currentFilter = filter;
+    // ฟังก์ชันสำหรับเปลี่ยนสถานะสีปุ่มเวลากด
+    function updateView(filter, event) {
         document.querySelectorAll('.time-filters button').forEach(btn => btn.classList.remove('active'));
         event.target.classList.add('active');
-        renderChart();
+        // หมายเหตุ: ปัจจุบันปุ่มนี้เปลี่ยนแค่แถบสีเท่านั้น เนื่องจากกราฟถูกถอดออกไปแล้ว
     }
 
-    function renderChart() {
-        if(allData.length === 0) return;
-        let count = 20; // live
-        if(currentFilter === '1h') count = 180;
-        if(currentFilter === '1d') count = 4320;
-        if(currentFilter === '3d') count = 12960;
-
-        let display = allData.slice(-count);
-        powerChart.data.labels = display.map(d => new Date(d.time).toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'}));
-        powerChart.data.datasets[0].data = display.map(d => d.w);
-        powerChart.update();
-    }
-
-    initChart();
     fetchData();
     setInterval(fetchData, 10000); 
 </script>
