@@ -3,64 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KU Energy Monitoring</title>
+    <title>KUWIN Energy Monitoring</title>
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; margin: 0; padding: 20px; }
         .container { max-width: 1200px; margin: auto; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        
-        /* สไตล์ปุ่มกด */
-        .time-filters button {
-            background: white; border: 1px solid #ddd; padding: 8px 15px; 
-            cursor: pointer; border-radius: 5px; margin-left: 5px; font-weight: bold;
-        }
+        .time-filters button { background: white; border: 1px solid #ddd; padding: 8px 15px; cursor: pointer; border-radius: 5px; font-weight: bold; }
         .time-filters button.active { background: #f1c40f; color: #333; border-color: #f1c40f; }
-
         .grid-dashboard { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
         .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .label { font-size: 0.85rem; color: #888; text-transform: uppercase; font-weight: bold; }
         .value-text { font-size: 2.2rem; font-weight: bold; color: #2c3e50; margin: 5px 0; }
-        
-        /* เกจวัด */
         .gauge-container { display: flex; flex-direction: column; align-items: center; height: 110px; }
         .gauge-circle { width: 90px; height: 90px; border-radius: 50%; border: 7px solid #f0f2f5; display: flex; align-items: center; justify-content: center; flex-direction: column; }
-        .gauge-circle.yellow { border-top-color: #f1c40f; } 
-        .gauge-circle.blue { border-top-color: #3498db; }  
-        .gauge-circle.red { border-top-color: #e74c3c; }   
-        .gauge-val { font-size: 1.4rem; font-weight: bold; }
-        
-        /* จัด Layout ให้ 3D และ ค่าไฟ เต็มจอ */
+        .gauge-circle.yellow { border-top-color: #f1c40f; } .gauge-circle.blue { border-top-color: #3498db; } .gauge-circle.red { border-top-color: #e74c3c; }
         .full-card { grid-column: span 4; }
-        .cost-card { grid-column: span 4; border-left: 5px solid #e67e22; }
         model-viewer { width: 100%; height: 400px; background: #fafbfc; border-radius: 8px; }
     </style>
 </head>
 <body>
-
 <div class="container">
     <div class="header">
-        <h2>⚡ KU Energy Dashboard</h2>
-        <div class="time-filters" id="filter-group">
+        <h2>⚡ KUWIN Energy Dashboard</h2>
+        <div class="time-filters">
             <button class="active" onclick="updateView('live', event)">Live</button>
             <button onclick="updateView('1h', event)">1h</button>
             <button onclick="updateView('1d', event)">1d</button>
             <button onclick="updateView('3d', event)">3d</button>
         </div>
     </div>
-
     <div class="grid-dashboard">
-        <div class="card"><div class="label">Voltage</div><div class="value-text"><span id="val-v">0.0</span> <small style="font-size: 1rem;">V</small></div></div>
-        <div class="card"><div class="label" style="text-align:center;">Power</div><div class="gauge-container"><div class="gauge-circle yellow"><span class="gauge-val" id="val-w">0</span><small>W</small></div></div></div>
-        <div class="card"><div class="label" style="text-align:center;">Current</div><div class="gauge-container"><div class="gauge-circle red"><span class="gauge-val" id="val-a">0</span><small>A</small></div></div></div>
-        <div class="card"><div class="label" style="text-align:center;">Energy</div><div class="gauge-container"><div class="gauge-circle blue"><span class="gauge-val" id="val-kwh">0</span><small>kWh</small></div></div></div>
-
+        <div class="card"><div class="label">Voltage</div><div class="value-text"><span id="val-v">0.0</span> <small>V</small></div></div>
+        <div class="card"><div class="label" style="text-align:center;">Power</div><div class="gauge-container"><div class="gauge-circle yellow"><span id="val-w">0</span><small>W</small></div></div></div>
+        <div class="card"><div class="label" style="text-align:center;">Current</div><div class="gauge-container"><div class="gauge-circle red"><span id="val-a">0</span><small>A</small></div></div></div>
+        <div class="card"><div class="label" style="text-align:center;">Energy</div><div class="gauge-container"><div class="gauge-circle blue"><span id="val-kwh">0</span><small>kWh</small></div></div></div>
         <div class="card full-card">
             <div class="label">3D Building View</div>
-            <model-viewer src="building.glb" auto-rotate camera-controls shadow-intensity="1"></model-viewer>
+            <model-viewer src="3 Buildings.glb" auto-rotate camera-controls shadow-intensity="1"></model-viewer>
         </div>
-
-        <div class="card cost-card">
+        <div class="card full-card" style="border-left: 5px solid #e67e22;">
             <div class="label">ประมาณการค่าไฟฟ้า</div>
             <div class="value-text" style="color: #e67e22;" id="val-cost">0.00 <small>บาท</small></div>
             <div id="period-status" style="font-size: 0.85rem; color: #7f8c8d;">-</div>
@@ -69,40 +51,34 @@
 </div>
 
 <script>
-    // ==========================================
-    // ⚠️ นำ Web App URL ของคุณมาใส่ตรงนี้ ⚠️
-    // ==========================================
-   const API_URL = "https://script.google.com/macros/s/AKfycbz3UmNJ31-e9dftKJgmOtVf5GHCx0Ss75L2zDTnv4f8s1Y_MH9bbQpRHjk14XP9W-q4/exec?action=read";
-    
+    // แก้ไข: ใส่เครื่องหมายคำพูด " " ล้อมรอบ URL ให้ถูกต้อง
+    const API_URL = "https://script.google.com/macros/s/AKfycbz3UmNJ31-e9dftKJgmOtVf5GHCx0Ss75L2zDTnv4f8s1Y_MH9bbQpRHjk14XP9W-q4/exec?action=read";
+
     async function fetchData() {
         try {
             const res = await fetch(API_URL);
             const data = await res.json();
             if(data.error) return;
 
-            // อัปเดตค่าล่าสุดลง Card/Gauge
             document.getElementById('val-v').innerText = parseFloat(data.latest.v).toFixed(1);
-            document.getElementById('val-w').innerText = parseFloat(data.latest.w).toFixed(0); 
-            document.getElementById('val-a').innerText = parseFloat(data.latest.a).toFixed(2); 
-            document.getElementById('val-kwh').innerText = parseFloat(data.latest.kwh).toFixed(2); 
+            document.getElementById('val-w').innerText = parseFloat(data.latest.w).toFixed(0);
+            document.getElementById('val-a').innerText = parseFloat(data.latest.a).toFixed(2);
+            document.getElementById('val-kwh').innerText = parseFloat(data.latest.kwh).toFixed(2);
 
-            // คำนวณค่าไฟ
-            const now = new Date();
-            let isOnPeak = (now.getDay() >= 1 && now.getDay() <= 5 && now.getHours() >= 9 && now.getHours() < 22);
-            let cost = data.latest.kwh * ((isOnPeak ? 4.3297 : 2.6369) + 0.3972) * 1.07; 
+            let now = new Date();
+            let isOnPeak = (now.getHours() >= 9 && now.getHours() < 22 && now.getDay() >= 1 && now.getDay() <= 5);
+            let cost = parseFloat(data.latest.kwh) * ((isOnPeak ? 4.3297 : 2.6369) + 0.3972) * 1.07;
             document.getElementById('val-cost').innerHTML = cost.toLocaleString(undefined, {minimumFractionDigits: 2}) + ' <small>บาท</small>';
-            document.getElementById('period-status').innerText = "ช่วงเวลาปัจจุบัน: " + (isOnPeak ? "ON-PEAK" : "OFF-PEAK");
-
-        } catch (e) { 
-            console.error("Error Fetching Data:", e); 
-        }
+            document.getElementById('period-status').innerText = "ช่วงเวลา: " + (isOnPeak ? "ON-PEAK" : "OFF-PEAK");
+        } catch (e) { console.error("Fetch error:", e); }
     }
 
-    // ฟังก์ชันสำหรับเปลี่ยนสถานะสีปุ่มเวลากด
     function updateView(filter, event) {
+        // อัปเดตสถานะปุ่ม
         document.querySelectorAll('.time-filters button').forEach(btn => btn.classList.remove('active'));
         event.target.classList.add('active');
-        // หมายเหตุ: ปัจจุบันปุ่มนี้เปลี่ยนแค่แถบสีเท่านั้น เนื่องจากกราฟถูกถอดออกไปแล้ว
+        console.log("Selected filter:", filter);
+        // เนื่องจากเอา History ออกแล้ว ปุ่มเหล่านี้จะยังไม่มีผลกับกราฟ แต่จะไม่ทำให้เกิด Error ครับ
     }
 
     fetchData();
